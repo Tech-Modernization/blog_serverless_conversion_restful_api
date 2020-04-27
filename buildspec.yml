@@ -1,0 +1,21 @@
+version: 0.2	
+
+env:
+  variables:
+    DYNAMODB_ENDPOINT: "http://localhost:8000"
+    NEW_ENVIRONMENT: YES
+
+phases:
+  build:
+    commands:
+      - bash test.sh
+
+artifacts:
+  files:
+    - '.ebextensions/*'
+    - '*.js'
+    - '*.json'
+    - '*.md'
+    - '*.sh'
+    - '*.yml'
+  name: restapi-$AWS_REGION-$(date +%Y-%m-%d)
