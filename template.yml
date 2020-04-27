@@ -1,0 +1,102 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Serverless Express Application/API powered by API Gateway and Lambda
+Resources:
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: root
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+      - PolicyName: dynamodb-table-access
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Sid: ListAndDescribe
+            Effect: Allow
+            Action:
+            - dynamodb:List*
+            - dynamodb:DescribeReservedCapacity*
+            - dynamodb:DescribeLimits
+            - dynamodb:DescribeTimeToLive
+            Resource: "*"
+          - Sid: SpecificTable
+            Effect: Allow
+            Action:
+            - dynamodb:BatchGet*
+            - dynamodb:DescribeStream
+            - dynamodb:DescribeTable
+            - dynamodb:Get*
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:BatchWrite*
+            - dynamodb:CreateTable
+            - dynamodb:Delete*
+            - dynamodb:Update*
+            - dynamodb:PutItem
+            Resource: !GetAtt CommentsTable.Arn
+
+  lambdaRestAPIFunc:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambda.handler
+      MemorySize: 1024
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: nodejs12.x
+      Timeout: 30
+      Environment:
+        Variables:
+          DYNAMODB_TABLENAME: !Ref CommentsTable
+      Events:
+        ProxyApiRoot:
+          Type: Api
+          Properties:
+            Path: /
+            Method: ANY
+        ProxyApiGreedy:
+          Type: Api
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+
+  CommentsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      KeySchema:
+        HashKeyElement: {AttributeName: Subject, AttributeType: S}
+        RangeKeyElement: {AttributeName: User, AttributeType: S}
+      ProvisionedThroughput: {ReadCapacityUnits: 1, WriteCapacityUnits: 1}
+
+
+Outputs:
+  LambdaFunctionConsoleUrl:
+    Description: Console URL for the Lambda Function.
+    Value: !Join
+      - ''
+      - - https://
+        - !Ref AWS::Region
+        - ".console.aws.amazon.com/lambda/home?region="
+        - !Ref AWS::Region
+        - "#/functions/"
+        - !Ref lambdaRestAPIFunc
+  APIEndPoint:
+    Description: Rest API endpoint.
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/${ServerlessRestApiProdStage}"
